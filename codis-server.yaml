@@ -1,0 +1,118 @@
+apiVersion: "apps/v1beta1"
+kind: StatefulSet
+metadata:
+  name: zxbk-codis-server
+  namespace: qiqi-china-zxbk-prod
+spec:
+  serviceName: zxbk-codis-server
+  replicas: 6
+  template:
+    metadata:
+      labels:
+        app: zxbk-codis-server
+    spec:
+      affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                  - node5
+                  - node6
+                  - node1
+                  - node2
+                  - master1
+                  - master2
+                  - master3
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                      - zxbk-codis-server
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: zxbk-codis-server
+        image: harbor.zxbike.cn/public/codis:3.2v1
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c","codis-server $(CODIS_PATH)/config/redis.conf --logfile $(POD_NAME).log --protected-mode no --bind $(POD_IP) --daemonize no --requirepass $(AUTH_PASS) --masterauth $(AUTH_PASS) | tail -f $(POD_NAME).log"]
+        #args: ["$(CODIS_PATH)/config/redis.conf","--logfile","$(POD_NAME).log","--protected-mode", "no", "--bind", "$(POD_IP)", "--daemonize", "no","--requirepass","$(AUTH_PASS)","--masterauth","$(AUTH_PASS)"]
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "codis-admin --dashboard=${DASHBOARD_ADDR} --reload; if [ $? != 0 ]; then exit 1; fi; \
+                        sid=`hostname |awk -F'-' '{print $4}'`;gid=$(expr $sid / ${SERVER_REPLICA} + 1); \
+                        codis-admin --dashboard=${DASHBOARD_ADDR} --create-group --gid=${gid} 1>/dev/null 2>&1; \
+                        codis-admin --dashboard=${DASHBOARD_ADDR} --group-add --gid=${gid} --addr=${POD_IP}:6379; 
+                        if [ $? != 0  -a ${SERVER_REPLICA} -gt 1 ]; then exit 1; fi; \
+                        codis-admin --dashboard=${DASHBOARD_ADDR} --sync-action --create --addr=${POD_IP}:6379 1>/dev/null 2>&1 "]
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "codis-admin --dashboard=${DASHBOARD_ADDR} --reload; if [ $? != 0 ]; then exit 1; fi; \
+                        sid=`hostname |awk -F'-' '{print $4}'`;gid=$(expr $sid / ${SERVER_REPLICA} + 1); sleep 5;\
+                        codis-admin --dashboard=${DASHBOARD_ADDR} --group-del --gid=${gid} --addr=${POD_IP}:6379"]
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
+        - name: SERVER_REPLICA
+          value: "2"
+        - name: AUTH_PASS
+          value: "MTIzLmNvbQo"
+        - name: CODIS_PATH
+          value: "/gopath/src/github.com/CodisLabs/codis"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: DASHBOARD_ADDR
+          value: "zxbk-codis-dashboard:18080"
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+          - name: data
+            mountPath: /codis
+          # - name: redis-config
+            # mountPath: /gopath/src/github.com/CodisLabs/codis/config/
+        ports:
+        - containerPort: 6379
+          name: service-port
+        resources:
+          limits:
+            cpu: "2"
+            memory: 6Gi
+          requests:
+            cpu: "0.1"
+            memory: 0.1Gi
+        livenessProbe: &healthcheck
+          exec:
+            command: ["/bin/sh", "-c", "redis-cli -h $POD_IP -p 6379 -a $AUTH_PASS ping"]
+        readinessProbe:
+          <<: *healthcheck
+      # volumes:
+        # - name: redis-config
+          # configMap:
+            # name: zxbk-codis
+            # items: 
+            # - key: redis.conf
+              # path: redis.conf
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        annotations:
+          volume.beta.kubernetes.io/storage-class: "zxbk-redis"
+          gcp-auto-backup: "yes"
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 200Gi

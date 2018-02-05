@@ -1,0 +1,56 @@
+apiVersion: "apps/v1beta1"
+kind: StatefulSet
+metadata:
+  name: zxbk-codis-dashboard
+  namespace: qiqi-china-zxbk-prod
+spec:
+  replicas: 1
+  serviceName: zxbk-codis-dashboard
+  template:
+    metadata:
+      labels:
+        app: zxbk-codis-dashboard
+    spec:
+      containers:
+      - name: zxbk-codis-dashboard
+        image: harbor.zxbike.cn/public/codis:3.2v1
+        imagePullPolicy: IfNotPresent
+        #command: ["/bin/bash", "-c", "codis-dashboard -l $(POD_NAME).log -c $(CODIS_PATH)/config/dashboard.toml --host-admin $(POD_IP):18080 --zookeeper $(ZK_ADDR) --product_name $(PRODUCT_NAME) --product_auth $(PRODUCT_AUTH) --pidfile log/dashboard.pid --remove-lock |while [ ! -f /codis/$(POD_NAME).log.* ];do sleep 1;done|tail -f /codis/$(POD_NAME).log.*"]
+        command: ["/bin/bash", "-c", "codis-dashboard -l $(POD_NAME).log -c $(CODIS_PATH)/config/dashboard.toml --host-admin $(POD_IP):18080 --zookeeper $(ZK_ADDR) --product_name $(PRODUCT_NAME) --product_auth $(PRODUCT_AUTH) --pidfile log/dashboard.pid --remove-lock"]
+        #args: ["-l","log/$(POD_NAME).log","-c","$(CODIS_PATH)/config/dashboard.toml","--host-admin","$(POD_IP):18080", "--zookeeper","$(ZK_ADDR)","--product_name","$(PRODUCT_NAME)","--product_auth","$(PRODUCT_AUTH)","--pidfile","log/dashboard.pid","--remove-lock"]
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/bash", "-c", "codis-admin --dashboard-list  --zookeeper=${ZK_ADDR}"]
+          preStop:
+            exec:
+              command: [/bin/sh", "-c", "PID=$(cat log/dashboard.pid) && kill $PID && while ps -p 1 > /dev/null; do sleep 1; done"]
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
+        - name: CODIS_PATH
+          value: "/gopath/src/github.com/CodisLabs/codis"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ZK_ADDR
+          value: "zxbk-zookeeper-public:2181"
+        - name: PRODUCT_NAME
+          value: "zxbk-codis"
+        - name: PRODUCT_AUTH
+          value: "MTIzLmNvbQo"
+        ports:
+        - containerPort: 18080
+          name: dashboard
+        resources:
+          limits:
+            cpu: "1"
+            memory: 2Gi
+          requests:
+            cpu: "0.1"
+            memory: 0.1Gi

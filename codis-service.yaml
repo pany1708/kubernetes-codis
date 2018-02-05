@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zxbk-codis-dashboard
+  name: zxbk-codis-dashboard
+  namespace: qiqi-china-zxbk-prod
+spec:
+  clusterIP: None
+  ports:
+    - port: 18080
+  selector:
+    app: zxbk-codis-dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zxbk-codis-fe
+  name: zxbk-codis-fe
+  namespace: qiqi-china-zxbk-prod
+spec:
+  type: NodePort
+  ports:
+    - port: 8080
+      nodePort: 31080
+  selector:
+    app: zxbk-codis-fe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zxbk-codis-proxy
+  name: zxbk-codis-proxy
+  namespace: qiqi-china-zxbk-prod
+spec:
+  ports:
+    - port: 11080
+      name: proxy
+    - port: 19000
+      nodePort: 36379
+      name: admin
+  type: NodePort
+  selector:
+    app: zxbk-codis-proxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zxbk-codis-server
+  name: zxbk-codis-server
+  namespace: qiqi-china-zxbk-prod
+spec:
+  clusterIP: None
+  ports:
+    - port: 6379
+  selector:
+    app: zxbk-codis-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zxbk-codis-sentinel
+  name: zxbk-codis-sentinel
+  namespace: qiqi-china-zxbk-prod
+spec:
+  clusterIP: None
+  ports:
+    - port: 26379
+  selector:
+    app: zxbk-codis-sentinel

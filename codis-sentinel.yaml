@@ -1,0 +1,60 @@
+apiVersion: "apps/v1beta1"
+kind: StatefulSet
+metadata:
+  name: zxbk-codis-sentinel
+  namespace: qiqi-china-zxbk-prod
+spec:
+  replicas: 3
+  serviceName: zxbk-codis-sentinel
+  template:
+    metadata:
+      labels:
+        app: zxbk-codis-sentinel
+    spec:
+      affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                      - zxbk-codis-sentinel
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: zxbk-codis-sentinel
+        image: harbor.zxbike.cn/public/codis:3.2v1
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c","redis-sentinel $(CODIS_PATH)/config/sentinel.conf --bind 0.0.0.0 --protected-mode no"]
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/bash", "-c", "codis-admin --dashboard=${DASHBOARD_ADDR} --sentinel-add --addr=${POD_IP}:26379 1>/dev/null 2>&1;codis-admin --dashboard=${DASHBOARD_ADDR} --sentinel-resync"]
+          preStop:
+            exec:
+              command: ["/bin/bash", "-c", "codis-admin --dashboard=${DASHBOARD_ADDR} --sentinel-del --addr=${POD_IP}:26379 --force 1>/dev/null 2>&1"]
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
+        - name: CODIS_PATH
+          value: "/gopath/src/github.com/CodisLabs/codis"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: DASHBOARD_ADDR
+          value: "zxbk-codis-dashboard:18080"
+        ports:
+        - containerPort: 26379
+          name: sentinel-port
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+          requests:
+            cpu: "0.1"
+            memory: 0.1Gi

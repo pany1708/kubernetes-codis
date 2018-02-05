@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: zxbk-codis-fe
+  namespace: qiqi-china-zxbk-prod
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: zxbk-codis-fe
+    spec:
+      containers:
+      - name: zxbk-codis-fe
+        image: harbor.zxbike.cn/public/codis:3.2v1
+        imagePullPolicy: IfNotPresent
+        #command: ["/bin/sh", "-c","codis-fe -l $(POD_NAME).log --zookeeper $(ZK_ADDR) --listen=$(POD_IP):8080 --assets=$(CODIS_PATH)/bin/assets |while [ ! -f /codis/$(POD_NAME).log.* ];do sleep 1;done| tail -f /codis/$(POD_NAME).log.*"]
+        command: ["/bin/sh", "-c","codis-fe -l $(POD_NAME).log --zookeeper $(ZK_ADDR) --listen=$(POD_IP):8080 --assets=$(CODIS_PATH)/bin/assets"]
+        #args: ["-l","log/$(POD_NAME).log","--zookeeper","$(ZK_ADDR)","--listen=$(POD_IP):8080","--assets=$(CODIS_PATH)/bin/assets"]
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
+        - name: CODIS_PATH
+          value: "/gopath/src/github.com/CodisLabs/codis"
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ZK_ADDR
+          value: "zxbk-zookeeper-public:2181"
+        ports:
+        - containerPort: 8080
+          name: fe
+        resources:
+          limits:
+            cpu: "1"
+            memory: 2Gi
+          requests:
+            cpu: "0.1"
+            memory: 0.1Gi
