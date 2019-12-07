@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: zk-config
-  namespace: qiqi-china-zxbk-prod
+  namespace: {{NS}}
 data:
   ensemble: "zk-0;zk-1;zk-2"
   jvm.heap: "2G"
@@ -17,7 +17,7 @@ apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: zk-budget
-  namespace: qiqi-china-zxbk-prod
+  namespace: {{NS}}
 spec:
   selector:
     matchLabels:
@@ -28,7 +28,7 @@ apiVersion: apps/v1beta1
 kind: StatefulSet
 metadata:
   name: zk
-  namespace: qiqi-china-zxbk-prod
+  namespace: {{NS}}
 spec:
   serviceName: zookeeper
   replicas: 3
@@ -57,7 +57,7 @@ spec:
       containers:
       - name: k8szk
         imagePullPolicy: IfNotPresent
-        image: harbor.zxbike.cn/public/k8szk:v1
+        image: wumingjian/k8szk
         resources:
           limits:
             cpu: "1"
